@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-3xl mx-auto mt-10 p-8 bg-white rounded shadow">
+    <h2 class="text-3xl font-bold mb-6 text-indigo-700 text-center">
+        Welcome, {{ student.name }}!
+    </h2>
+    <form method="POST" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for subj in marks_data %}
+            <div class="p-4 border rounded shadow">
+                <h3 class="font-semibold mb-2">{{ subj.subject }}</h3>
+                <input type="number" name="cie_marks" min="0" max="30"
+                    value="{{ subj.cie_marks }}" required
+                    class="border p-2 w-full mb-2" placeholder="Enter marks (0-30)">
+                <input type="hidden" name="subject" value="{{ subj.subject }}">
+                {% if subj.message %}
+                <div class="text-red-500 text-sm mb-2">{{ subj.message }}</div>
+                {% endif %}
+                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded">
+                    Update Marks
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </form>
+
+    <h3 class="text-xl font-semibold mt-8 mb-2">Rewards</h3>
+    <ul class="list-disc list-inside">
+        {% for reward in rewards %}
+        <li>{{ reward }}</li>
+        {% else %}
+        <li>No rewards yet.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

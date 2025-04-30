@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Department Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="text-4xl font-bold text-blue-700 mb-8">Department: {{ department.name }} - Class: {{ department.class_name }}</h1>
+
+<div class="mb-8 p-6 bg-white rounded shadow">
+    <h2 class="text-2xl font-semibold mb-4">All Student Rewards</h2>
+    <ul class="list-disc list-inside max-h-96 overflow-y-auto">
+        {% for reward, student, subject in all_rewards %}
+        <li>
+            <strong>{{ student.name }} ({{ student.usn }})</strong> - Subject: {{ subject.name }} ({{ subject.code }}) - 
+            Reward: <span class="font-semibold">{{ reward.reward_type }}</span> - {{ reward.description }}
+        </li>
+        {% else %}
+        <li>No rewards recorded yet.</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="mb-8 p-6 bg-white rounded shadow">
+    <h2 class="text-2xl font-semibold mb-4">Reward Summary</h2>
+    <ul class="list-disc list-inside">
+        {% for reward_type, count in reward_stats.items() %}
+        <li>{{ reward_type }}: {{ count }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

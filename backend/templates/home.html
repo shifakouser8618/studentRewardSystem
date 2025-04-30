@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="text-center py-10">
+    <h1 class="text-4xl font-bold text-indigo-700 mb-6">Student Reward System</h1>
+    <p class="text-xl mb-8">Track performance, calculate required marks, and earn rewards</p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-all">
+            <div class="p-6 bg-indigo-600 text-white">
+                <i class="fas fa-user-graduate text-5xl mb-4"></i>
+                <h2 class="text-2xl font-bold">Student</h2>
+            </div>
+            <div class="p-6">
+                <p class="mb-4">Add your marks, view required scores for next internals, and see your rewards.</p>
+                <a href="{{ url_for('student_login') }}" class="block w-full py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-center">
+                    Login as Student
+                </a>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-all">
+            <div class="p-6 bg-purple-600 text-white">
+                <i class="fas fa-chalkboard-teacher text-5xl mb-4"></i>
+                <h2 class="text-2xl font-bold">Faculty</h2>
+            </div>
+            <div class="p-6">
+                <p class="mb-4">See top-performing students and track all student rewards for your subject.</p>
+                <a href="{{ url_for('faculty_login') }}" class="block w-full py-2 px-4 bg-purple-600 text-white rounded hover:bg-purple-700 text-center">
+                    Login as Faculty
+                </a>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-all">
+            <div class="p-6 bg-blue-600 text-white">
+                <i class="fas fa-building text-5xl mb-4"></i>
+                <h2 class="text-2xl font-bold">Department</h2>
+            </div>
+            <div class="p-6">
+                <p class="mb-4">View all student rewards and recognize top performers in your department.</p>
+                <a href="{{ url_for('department_login') }}" class="block w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 text-center">
+                    Login as Department
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
