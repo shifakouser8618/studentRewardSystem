@@ -4,33 +4,58 @@
     <h2 class="text-3xl font-bold mb-6 text-indigo-700 text-center">
         Welcome, {{ student.name }}!
     </h2>
-    <form method="POST" class="space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {% for subj in marks_data %}
-            <div class="p-4 border rounded shadow">
-                <h3 class="font-semibold mb-2">{{ subj.subject }}</h3>
-                <input type="number" name="cie_marks" min="0" max="30"
-                    value="{{ subj.cie_marks }}" required
-                    class="border p-2 w-full mb-2" placeholder="Enter marks (0-30)">
-                <input type="hidden" name="subject" value="{{ subj.subject }}">
-                {% if subj.message %}
-                <div class="text-red-500 text-sm mb-2">{{ subj.message }}</div>
-                {% endif %}
-                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded">
-                    Update Marks
-                </button>
-            </div>
+
+    {% for subj in subjects_data %}
+    <div class="mb-8 p-4 border rounded shadow">
+        <h3 class="font-semibold mb-2 text-lg">{{ subj.subject.name }}</h3>
+        <p>Average Marks: {{ "%.2f"|format(subj.avg_marks) }}</p>
+        {% if subj.focus_message %}
+        <div class="text-red-600 mb-2">{{ subj.focus_message }}</div>
+        {% endif %}
+        <ul class="mb-4">
+            {% for mark in subj.marks %}
+            <li>Internal {{ mark.internal_number }}: {{ mark.marks }}</li>
             {% endfor %}
-        </div>
-    </form>
+        </ul>
+
+        <form method="POST" action="{{ url_for('add_marks') }}" class="space-y-2">
+            <input type="hidden" name="subject_id" value="{{ subj.subject.id }}">
+            <div>
+                <label for="internal_number_{{ subj.subject.id }}">Internal Number (1, 2, 3):</label>
+                <input type="number" name="internal_number" id="internal_number_{{ subj.subject.id }}" min="1" max="3" required class="border p-2 rounded w-20 ml-2">
+            </div>
+            <div>
+                <label for="marks_{{ subj.subject.id }}">Marks (0-30):</label>
+                <input type="number" name="marks" id="marks_{{ subj.subject.id }}" min="0" max="30" step="0.01" required class="border p-2 rounded w-24 ml-2">
+            </div>
+            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded">
+                Add/Update Marks
+            </button>
+        </form>
+        {% if subj.message %}
+        <div class="text-red-500 text-sm mt-2">{{ subj.message }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
 
     <h3 class="text-xl font-semibold mt-8 mb-2">Rewards</h3>
     <ul class="list-disc list-inside">
-        {% for reward in rewards %}
-        <li>{{ reward }}</li>
-        {% else %}
-        <li>No rewards yet.</li>
+        {% set rewards_found = false %}
+        {% for subj in subjects_data %}
+            {% if subj.rewards|length > 0 %}
+                {% set rewards_found = true %}
+            {% endif %}
         {% endfor %}
+
+        {% if not rewards_found %}
+            <li>No rewards yet.</li>
+        {% else %}
+            {% for subj in subjects_data %}
+                {% for reward in subj.rewards %}
+                    <li>{{ reward.reward_type }} for {{ subj.subject.name }}</li>
+                {% endfor %}
+            {% endfor %}
+        {% endif %}
     </ul>
 </div>
 {% endblock %}
