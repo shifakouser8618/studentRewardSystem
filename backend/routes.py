@@ -2,7 +2,6 @@ from flask import render_template, url_for, flash, redirect, request, jsonify, s
 from models import db, Student, Faculty, Department, Subject, Mark, Reward
 from logic import RewardCalculator
 
-from config import SUBJECTS
 
 
 def configure_routes(app):
@@ -36,47 +35,34 @@ def configure_routes(app):
         if 'student_id' not in session:
             flash('Please login first', 'error')
             return redirect(url_for('student_login'))
-        
+
         student_id = session['student_id']
         student = Student.query.get(student_id)
 
-        subjects = []
-        for subject_name in SUBJECTS:
-            subject = Subject.query.filter_by(name=subject_name).first()
-            if not subject:
-                subject = Subject(name=subject_name, code=subject_name.replace(" ", "_").upper())
-                db.session.add(subject)
-                db.session.commit()
-            subjects.append(subject)
+        subject_ids = db.session.query(Mark.subject_id).filter_by(student_id=student_id).distinct()
+        subjects = Subject.query.filter(Subject.id.in_(subject_ids)).all()
+
 
         subjects_data = []
         for subject in subjects:
-            marks_data = Mark.query.filter_by(student_id=student_id, subject_id=subject.id).order_by(Mark.internal_number).all()
-            total_marks = sum(mark.marks for mark in marks_data)
-            avg_marks = total_marks / len(marks_data) if marks_data else 0
+            marks = Mark.query.filter_by(student_id=student_id, subject_id=subject.id).all()
+            mark_map = {m.internal_number: m.marks for m in marks}
 
-            focus_message = ""
-            for mark in marks_data:
-                if mark.marks < 12:
-                    focus_message = "Focus on this subject."
-                    break
-
-            required_marks, message = RewardCalculator.calculate_required_marks(student_id, subject.id)
+            avg = sum(mark_map.values()) / 3 if len(mark_map) == 3 else None
             rewards = Reward.query.filter_by(student_id=student_id, subject_id=subject.id).all()
 
             subjects_data.append({
                 'subject': subject,
-                'marks': marks_data,
-                'avg_marks': avg_marks,
-                'focus_message': focus_message,
-                'required_marks': required_marks,
-                'message': message,
+                'i1': mark_map.get(1, '-'),
+                'i2': mark_map.get(2, '-'),
+                'i3': mark_map.get(3, '-'),
+                'avg': f"{avg:.2f}" if avg else 'Incomplete',
                 'rewards': rewards
             })
 
         return render_template('student_dashboard.html', student=student, subjects_data=subjects_data)
 
-    @app.route('/student/add_marks', methods=['POST'])
+    '''@app.route('/student/add_marks', methods=['POST'])
     def add_marks():
         if 'student_id' not in session:
             flash('Please login first', 'error')
@@ -111,7 +97,7 @@ def configure_routes(app):
         
         reward = RewardCalculator.assign_reward(student_id, subject_id, internal_number, marks)
         flash(f'Marks added successfully! You earned: {reward.reward_type}', 'success')
-        return redirect(url_for('student_dashboard'))
+        return redirect(url_for('student_dashboard'))'''
 
     # ------------------ Faculty Routes ------------------
 
@@ -156,6 +142,7 @@ def configure_routes(app):
 
         subjects_data = []
         for subject in subjects:
+            # Top students per internal
             top_students = []
             for internal in range(1, 4):
                 marks = db.session.query(Mark, Student)\
@@ -169,18 +156,124 @@ def configure_routes(app):
                     'students': marks
                 })
 
+            # Rewards for subject
             rewards = db.session.query(Reward, Student)\
                 .join(Student, Reward.student_id == Student.id)\
                 .filter(Reward.subject_id == subject.id)\
                 .all()
 
+            # Full mark sheet: all students for the subject
+            students = Student.query.all()
+            full_marks = []
+            for student in students:
+                marks = Mark.query.filter_by(student_id=student.id, subject_id=subject.id).all()
+                mark_map = {m.internal_number: m for m in marks}  # store full Mark objects
+
+                # Calculate average only if all 3 internals are present
+                if len(mark_map) == 3:
+                    avg = sum(m.marks for m in mark_map.values()) / 3
+                else:
+                    avg = None
+
+                reward = Reward.query.filter_by(student_id=student.id, subject_id=subject.id).first()
+
+                full_marks.append({
+                    'name': student.name,
+                    'usn': student.usn,
+                    'm1': mark_map.get(1),
+                    'm2': mark_map.get(2),
+                    'm3': mark_map.get(3),
+                    'avg': f"{avg:.2f}" if avg else 'Incomplete',
+                    'reward': reward.reward_type if reward else '-'
+                })
+
             subjects_data.append({
                 'subject': subject,
                 'top_students': top_students,
-                'rewards': rewards
+                'rewards': rewards,
+                'full_marks': full_marks
             })
 
         return render_template('faculty_dashboard.html', faculty=faculty, subjects_data=subjects_data)
+
+    @app.route('/faculty/edit_marks', methods=['POST'])
+    def faculty_edit_marks():
+        if 'faculty_id' not in session:
+            flash('Please login first', 'error')
+            return redirect(url_for('faculty_login'))
+
+        student_usn = request.form.get('student_usn')
+        subject_id = request.form.get('subject_id')
+        internal_number = int(request.form.get('internal_number'))
+        marks = float(request.form.get('marks'))
+
+        student = Student.query.filter_by(usn=student_usn).first()
+        if not student:
+            flash('Student not found.', 'error')
+            return redirect(url_for('faculty_dashboard'))
+
+        # Update or insert the mark
+        mark = Mark.query.filter_by(student_id=student.id, subject_id=subject_id, internal_number=internal_number).first()
+        if mark:
+            mark.marks = marks
+        else:
+            mark = Mark(
+                student_id=student.id,
+                subject_id=subject_id,
+                internal_number=internal_number,
+                marks=marks
+            )
+            db.session.add(mark)
+
+        # Update reward
+        RewardCalculator.assign_reward(student.id, subject_id, internal_number, marks)
+        db.session.commit()
+
+        flash(f'Marks updated for {student.name} - Internal {internal_number}', 'success')
+        return redirect(url_for('faculty_dashboard'))
+
+    @app.route('/faculty/send_motivation', methods=['POST'])
+    def send_motivation():
+        if 'faculty_id' not in session:
+            flash('Please login first', 'error')
+            return redirect(url_for('faculty_login'))
+
+        student_usn = request.form.get('student_usn')
+        subject_id = request.form.get('subject_id')
+        message = request.form.get('message')
+
+        student = Student.query.filter_by(usn=student_usn).first()
+        subject = Subject.query.get(subject_id)
+
+        if student and subject:
+            # Simulate storing or sending the message (e.g., log or flash for now)
+            flash(f'Motivation sent to {student.name} for {subject.name}: "{message}"', 'info')
+            # You could optionally store this in a new Motivation model if needed.
+        else:
+            flash('Failed to send motivation. Student or subject not found.', 'error')
+
+        return redirect(url_for('faculty_dashboard'))
+    
+    @app.route('/faculty/delete_subject/<int:subject_id>', methods=['POST'])
+    def delete_subject(subject_id):
+        if 'faculty_id' not in session:
+            flash('Please login first', 'error')
+            return redirect(url_for('faculty_login'))
+
+        subject = Subject.query.get(subject_id)
+        if not subject or subject.faculty_id != session['faculty_id']:
+            flash('Unauthorized or subject not found.', 'error')
+            return redirect(url_for('faculty_dashboard'))
+
+        # Delete related marks and rewards
+        Mark.query.filter_by(subject_id=subject.id).delete()
+        Reward.query.filter_by(subject_id=subject.id).delete()
+        db.session.delete(subject)
+        db.session.commit()
+
+        flash(f"Subject '{subject.name}' deleted.", 'success')
+        return redirect(url_for('faculty_dashboard'))
+
 
     # ------------------ Department Routes ------------------
 
