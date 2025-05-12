@@ -1,7 +1,11 @@
 from flask import render_template, url_for, flash, redirect, request, jsonify, session
 from models import db, Student, Faculty, Department, Subject, Mark, Reward
 from logic import RewardCalculator
-
+from Crypto.Cipher import AES, PKCS1_OAEP
+from Crypto.PublicKey import RSA
+from Crypto.Random import get_random_bytes
+import base64
+import os
 
 
 def configure_routes(app):
@@ -245,12 +249,47 @@ def configure_routes(app):
         student = Student.query.filter_by(usn=student_usn).first()
         subject = Subject.query.get(subject_id)
 
-        if student and subject:
-            # Simulate storing or sending the message (e.g., log or flash for now)
-            flash(f'Motivation sent to {student.name} for {subject.name}: "{message}"', 'info')
-            # You could optionally store this in a new Motivation model if needed.
-        else:
+        if not (student and subject):
             flash('Failed to send motivation. Student or subject not found.', 'error')
+            return redirect(url_for('faculty_dashboard'))
+
+        try:
+            # Load student's public key
+            key_path = os.path.join("keys", f"{student_usn}_public.pem")
+            if not os.path.exists(key_path):
+                flash(f"No public key found for {student_usn}. Please generate one.", "error")
+                return redirect(url_for('faculty_dashboard'))
+
+            with open(key_path, "rb") as f:
+                public_key = RSA.import_key(f.read())
+
+            # AES encryption
+            aes_key = get_random_bytes(16)
+            cipher_aes = AES.new(aes_key, AES.MODE_EAX)
+            ciphertext, tag = cipher_aes.encrypt_and_digest(message.encode())
+
+            # Encrypt AES key with student's public RSA key
+            cipher_rsa = PKCS1_OAEP.new(public_key)
+            encrypted_aes_key = cipher_rsa.encrypt(aes_key)
+
+            # Store encrypted message in database
+            reward = Reward(
+                student_id=student.id,
+                subject_id=subject.id,
+                internal_number=0,
+                reward_type="Motivational",
+                description="Encrypted message",
+                encrypted_message=base64.b64encode(ciphertext).decode(),
+                encrypted_aes_key=base64.b64encode(encrypted_aes_key).decode(),
+                nonce=base64.b64encode(cipher_aes.nonce).decode(),
+                tag=base64.b64encode(tag).decode()
+            )
+            db.session.add(reward)
+            db.session.commit()
+
+            flash(f"Motivation securely sent to {student.name} for {subject.name}.", "success")
+        except Exception as e:
+            flash(f"Encryption failed: {str(e)}", "error")
 
         return redirect(url_for('faculty_dashboard'))
     

@@ -41,6 +41,7 @@ class Subject(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     marks = db.relationship('Mark', backref='subject', lazy=True)
     rewards = db.relationship('Reward', backref='subject', lazy=True)
+    applicable_classes = db.Column(db.String(200), nullable=True)  # comma-separated list
 
     def __repr__(self):
         return f"Subject('{self.name}', '{self.code}')"
@@ -65,6 +66,28 @@ class Reward(db.Model):
     reward_type = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    encrypted_message = db.Column(db.Text, nullable=True)
+    encrypted_aes_key = db.Column(db.Text, nullable=True)
+    nonce = db.Column(db.Text)
+    tag = db.Column(db.Text)
 
     def __repr__(self):
         return f"Reward(Student: '{self.student_id}', Type: '{self.reward_type}')"
+
+class MotivationMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
+    subject_id = db.Column(db.Integer, db.ForeignKey('subject.id'), nullable=False)
+    encrypted_message = db.Column(db.LargeBinary, nullable=False)
+    encrypted_key = db.Column(db.LargeBinary, nullable=False)
+    iv = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"MotivationMessage(Student: '{self.student_id}', Subject: '{self.subject_id}')"
+
+class StudentKey(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id'), unique=True, nullable=False)
+    public_key = db.Column(db.Text, nullable=False)
+    private_key = db.Column(db.Text, nullable=False)
